@@ -291,6 +291,10 @@ if(CONFIG_BUILD_WITH_TFM)
   if(CONFIG_SOC_SERIES_PSE84)
     include(${ZEPHYR_BASE}/soc/infineon/edge/pse84/pse84_metadata.cmake)
     list(APPEND TFM_CMAKE_ARGS -DIFX_EPC=epc2)
+
+    zephyr_compile_definitions(IFX_MTB_SRF)
+    zephyr_compile_definitions(MTB_SRF_USE_PSA)
+
   endif()
 
   file(MAKE_DIRECTORY ${TFM_BINARY_DIR})
