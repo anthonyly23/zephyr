@@ -9,4 +9,6 @@
 		compatible = "zephyr,cdc-acm-uart";
 		label = "Zephyr USB CDC-ACM";
 	};
+
+	status = "okay";
 };
