@@ -36,7 +36,7 @@ void soc_early_init_hook(void)
 	ifx_cycfg_init();
 
 	/* Initialize SystemCoreClock variable. */
-	SystemCoreClockUpdate();
+//	SystemCoreClockUpdate();
 
 	static cy_stc_ipc_pipe_ep_t systemIpcPipeEpArray[CY_IPC_MAX_ENDPOINTS];
 

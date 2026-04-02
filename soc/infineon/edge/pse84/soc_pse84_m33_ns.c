@@ -43,6 +43,28 @@ void soc_early_init_hook(void)
 						MTB_SRF_MAX_ARG_OUT_SIZE);
 #endif /* CONFIG_BUILD_WITH_TFM */
 
+	/* Initialize SystemCoreClock variable. */
+	SystemCoreClockUpdate();
+
+	/* Enables PD1 power domain */
+	// Cy_System_EnablePD1();
+
+	/* Enables APP_MMIO_TCM memory for CM55 core */
+	Cy_SysClk_PeriGroupSlaveInit(CY_MMIO_CM55_TCM_512K_PERI_NR, CY_MMIO_CM55_TCM_512K_GROUP_NR,
+				     CY_MMIO_CM55_TCM_512K_SLAVE_NR,
+				     CY_MMIO_CM55_TCM_512K_CLK_HF_NR);
+
+	Cy_SysClk_PeriGroupSlaveInit(CY_MMIO_SMIF0_PERI_NR, CY_MMIO_SMIF0_GROUP_NR,
+				     CY_MMIO_SMIF0_SLAVE_NR, CY_MMIO_SMIF0_CLK_HF_NR);
+
+	Cy_SysClk_PeriGroupSlaveInit(CY_MMIO_SMIF01_PERI_NR, CY_MMIO_SMIF01_GROUP_NR,
+				     CY_MMIO_SMIF01_SLAVE_NR, CY_MMIO_SMIF01_CLK_HF_NR);
+
+	/* Enable SOCMEM */
+	// Cy_SysEnableSOCMEM(true);
+
+
+
 }
 
 void soc_late_init_hook(void)
