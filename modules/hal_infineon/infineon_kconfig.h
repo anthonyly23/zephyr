@@ -56,6 +56,7 @@
 #endif /* COMPONENT_CM55 */
 #ifndef CORE_NAME_CM55_0
 #define CORE_NAME_CM55_0
+
 #endif /* CORE_NAME_CM55_0 */
 
 #endif /* CONFIG_CPU_CORTEXT_M33* */
