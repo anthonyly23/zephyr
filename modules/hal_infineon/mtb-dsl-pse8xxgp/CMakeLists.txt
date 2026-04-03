@@ -108,11 +108,12 @@ zephyr_library_sources(${pdl_drv_dir}/source/cy_trigmux.c)
 zephyr_include_directories(${hal_dir}/include)
 zephyr_library_sources(${hal_dir}/source/mtb_hal_clock.c)
 
+zephyr_library_sources(${pdl_drv_dir}/source/cy_pdl_srf.c)
+zephyr_library_sources(${pdl_drv_dir}/source/cy_pdl_srf_common.c)
+
 if(CONFIG_BUILD_WITH_TFM)
   zephyr_library_sources(${hal_dir}/source/mtb_hal_system.c)
 
-  zephyr_library_sources(${pdl_drv_dir}/source/cy_pdl_srf.c)
-  zephyr_library_sources(${pdl_drv_dir}/source/cy_pdl_srf_common.c)
 
   set(tfm_ifx_dir ${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/platform/ext/target/infineon/common)
 
