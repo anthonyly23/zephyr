@@ -19,6 +19,7 @@ supported:
   - hwinfo
   - pinctrl
   - uart
+  - usb
   - spi
   - i2s
   - watchdog
