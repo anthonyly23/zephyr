@@ -75,7 +75,7 @@ extern "C" {
 
 /** IPC integration specific defines, adjusting the default BSP-generated setup */
 #if defined(COMPONENT_MW_MTB_IPC)
-#if defined(CY_SYSTEM_CPU_M55)
+#if defined(CONFIG_CPU_CORTEX_M55)
 /** Define Macro to identify that this core uses IPC for SRF */
 #define MTB_SRF_SUBMIT_USE_IPC
 #endif
