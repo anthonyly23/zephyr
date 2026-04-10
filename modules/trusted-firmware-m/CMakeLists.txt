@@ -292,8 +292,10 @@ if(CONFIG_BUILD_WITH_TFM)
     include(${ZEPHYR_BASE}/soc/infineon/edge/pse84/pse84_metadata.cmake)
     list(APPEND TFM_CMAKE_ARGS -DIFX_EPC=epc2)
 
-    zephyr_compile_definitions(IFX_MTB_SRF)
-    zephyr_compile_definitions(MTB_SRF_USE_PSA)
+    # If multicore support needed/wanted TODO_LC maybe needs to be guarded? 
+    list(APPEND TFM_CMAKE_ARGS -DIFX_MTB_MAILBOX=ON)
+    list(APPEND TFM_CMAKE_ARGS -DIFX_CM55_NS_PRESENT=ON)
+
 
   endif()
 
