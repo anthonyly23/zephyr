@@ -64,8 +64,6 @@ if(CONFIG_SOC_FAMILY_INFINEON_EDGE)
   if(CONFIG_CPU_CORTEX_M33 AND CONFIG_TRUSTED_EXECUTION_NONSECURE)
     # Use non secure device in cy_device_headers
     zephyr_library_compile_definitions(COMPONENT_NON_SECURE_DEVICE)
-    zephyr_compile_definitions(COMPONENT_MW_MTB_IPC)
-    zephyr_compile_definitions(COMPONENT_MW_MTB_SRF)
   endif()
 
   zephyr_library_compile_definitions_ifdef(CONFIG_CPU_CORTEX_M33 COMPONENT_CM33)
@@ -75,13 +73,11 @@ if(CONFIG_SOC_FAMILY_INFINEON_EDGE)
 
   if(CONFIG_CPU_CORTEX_M55)
     zephyr_compile_definitions(COMPONENT_NON_SECURE_DEVICE)
-    zephyr_compile_definitions(COMPONENT_MW_MTB_IPC)
-    zephyr_compile_definitions(COMPONENT_MW_MTB_SRF)
-    zephyr_compile_definitions(MTB_SRF_SUBMIT_USE_IPC)
-    zephyr_compile_definitions(CY_PDL_SYSCLK_ENABLE_SRF_INTEG)
-    zephyr_compile_definitions(_CY_PDL_SYSCLK_PPC_SECURED_HF)
+    zephyr_compile_definitions(COMPONENT_MW_MTB_IPC) # Needed to properly build the TF-M files needed for SRF support on CM55
+    zephyr_compile_definitions(COMPONENT_MW_MTB_SRF) # Needed to properly build the TF-M files needed for SRF support on CM55
   endif()
 
+  add_subdirectory(abstraction-rtos)
   add_subdirectory(mtb-srf)
   add_subdirectory(mtb-ipc)
   add_subdirectory(serial-memory)
