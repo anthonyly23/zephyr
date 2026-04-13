@@ -117,14 +117,67 @@ zephyr_library_sources(${pdl_drv_dir}/source/cy_pdl_srf_common.c)
 
 if(CONFIG_BUILD_WITH_TFM)
   zephyr_library_sources(${hal_dir}/source/mtb_hal_system.c)
+  zephyr_library_sources(${hal_dir}/source/mtb_hal_syspm.c)
 
 
   set(tfm_ifx_dir ${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/platform/ext/target/infineon/common)
 
+  # Minimum set of folders required for simple cm33s-cm33ns usage 
   zephyr_include_directories(${tfm_ifx_dir}/interface/include)
-  zephyr_library_sources(${tfm_ifx_dir}/interface/src/ifx_mtb_srf.c)
-
   zephyr_include_directories(${tfm_ifx_dir}/spe/services/ifx_ext_sp)
   zephyr_include_directories(${tfm_ifx_dir}/spe/svc)
+  # Minimum set of files required for simple cm33s-cm33ns usage 
+  zephyr_library_sources(${tfm_ifx_dir}/interface/src/ifx_mtb_srf.c)
   zephyr_library_sources(${tfm_ifx_dir}/spe/services/ifx_ext_sp/ifx_ext_sp_api.c)
+
+  # Additional includes and sources for mailbox support
+  zephyr_include_directories(${tfm_ifx_dir}/shared/mailbox)
+  zephyr_include_directories(${tfm_ifx_dir}/utils)
+  zephyr_include_directories(${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/platform/include)
+  zephyr_include_directories(${tfm_ifx_dir}/interface/include/ifx_mtb_mailbox)
+  zephyr_include_directories(${tfm_ifx_dir}/../pse84/shared)
+  zephyr_include_directories(${tfm_ifx_dir}/../pse84/board/KIT_PSOCE84_EVK/shared)
+
+  zephyr_library_sources(${tfm_ifx_dir}/utils/ifx_regions.c)  
+  zephyr_library_sources(${tfm_ifx_dir}/interface/src/ifx_mtb_srf_relay.c)
+  zephyr_library_sources(${tfm_ifx_dir}/spe/services/mailbox/platform_hal_multi_core_cm55.c)
+
+  # Additional defines for mailbox support
+  zephyr_compile_definitions(IFX_MTB_MAILBOX=1) # Needed to ensure we compile the mailbox code in TF-M
+  zephyr_compile_definitions(IFX_NS_INTERFACE_TZ=1) # Needed to ensure we compile the non secure TZ interface code in TF-M
+  zephyr_compile_definitions(CONFIG_TFM_PSA_CALL_ADDRESS_REMAP=1) # Needed to ensure we use the PSA call address remap defined in TF-M
+  
+endif()
+
+if(CONFIG_CPU_CORTEX_M55)
+
+# TODO_LC this whole section is for cm55 AND secure aware so the if needs to reflect that
+  zephyr_library_sources(${hal_dir}/source/mtb_hal_system.c)
+  zephyr_library_sources(${hal_dir}/source/mtb_hal_syspm.c)
+
+  #TODO_LC possibly insteas of selecting all these we could be able to reuse the cm33 folder? 
+  zephyr_include_directories(${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/interface/include)
+  zephyr_include_directories(${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/secure_fw/include)
+  zephyr_include_directories(${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/config)
+  zephyr_include_directories(${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/secure_fw/spm/include)
+
+  # Paired-build setup: consume generated PSA manifest headers from cm33_ns build
+  # TODO_LC We need to find a way to specify the cm33 build folder instead of hardcoding
+  zephyr_include_directories(${ZEPHYR_BASE}/build/tfm/generated/interface/include)
+  zephyr_include_directories(${ZEPHYR_BASE}/build/tfm/api_ns/interface/include)
+  zephyr_include_directories(${ZEPHYR_BASE}/build/tfm/generated/interface/include)
+  zephyr_include_directories(${ZEPHYR_BASE}/build/tfm/api_ns/interface/include)
+
+  set(tfm_ifx_dir ${ZEPHYR_TRUSTED_FIRMWARE_M_MODULE_DIR}/platform/ext/target/infineon/common)
+  
+  #TODO_LC possibly insteas of selecting all these we could be able to reuse the cm33 folder? 
+  zephyr_include_directories(${tfm_ifx_dir}/interface/include)
+  zephyr_include_directories(${tfm_ifx_dir}/spe/services/ifx_ext_sp)
+  zephyr_include_directories(${tfm_ifx_dir}/spe/svc)
+  zephyr_include_directories(${tfm_ifx_dir}/interface/include/ifx_mtb_mailbox)
+
+  zephyr_library_sources(${tfm_ifx_dir}/interface/src/ifx_mtb_srf.c)
+  zephyr_library_sources(${tfm_ifx_dir}/spe/services/ifx_ext_sp/ifx_ext_sp_api.c)
+  zephyr_library_sources(${tfm_ifx_dir}/interface/src/ifx_mtb_mailbox/ifx_mtb_mailbox_psa_ns_api.c)
+  zephyr_library_sources(${tfm_ifx_dir}/interface/src/ifx_mtb_mailbox/ifx_mtb_mailbox.c)
 endif()

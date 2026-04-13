@@ -16,7 +16,8 @@
 #include "soc.h"
 #include <cy_sysint.h>
 #include <system_edge.h>
-#include <ifx_cycfg_init.h>
+// TODO_LC This is probably still needed in the non TF-M interlinked case
+// #include <ifx_cycfg_init.h> 
 
 #include "cy_pdl.h"
 
@@ -28,10 +29,15 @@
 #include "mtb_ipc_config.h"
 #include "mtb_srf_ipc_init.h"
 
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+
 #define CY_IPC_MAX_ENDPOINTS (8UL)
 
 #define CM55_STARTUP_WAIT_MS 50u
 
+
+#define PSE84_CPU_FREQ_HZ DT_PROP(DT_PATH(cpus, cpu_1), clock_frequency)
 #define MTB_IPC_IRQ_SEMA_SRF                        (MTB_IPC_IRQ_SEMA_SRF_CLIENT)
 #define MTB_IPC_IRQ_QUEUE_SRF                       (MTB_IPC_IRQ_QUEUE_SRF_CLIENT)
 
@@ -49,32 +55,20 @@ mtb_ipc_t cybsp_cm55_ipc_instance;
 
 void cybsp_srf_ipc_semaphore_interrupt_handler(void)
 {
-    #if defined(MTB_SRF_SUBMIT_USE_IPC)
     mtb_ipc_semaphore_process_interrupt(&cybsp_cm55_ipc_instance);
-    #else
-    mtb_ipc_semaphore_process_interrupt(&cybsp_cm33_ipc_instance);
-    #endif
 }
 
 void cybsp_srf_ipc_queue_interrupt_handler(void)
 {
-    #if defined(MTB_SRF_SUBMIT_USE_IPC)
     mtb_ipc_queue_process_interrupt(&cybsp_cm55_ipc_instance);
-    #else
-    mtb_ipc_queue_process_interrupt(&cybsp_cm33_ipc_instance);
-    #endif
 }
 
 mtb_srf_pool_t cy_pdl_srf_default_pool;
-
-cy_rslt_t mtb_srf_request_submit(
-    mtb_srf_invec_ns_t* inVec_ns, uint8_t inVec_cnt_ns,
-    mtb_srf_outvec_ns_t* outVec_ns, uint8_t outVec_cnt_ns)
-{
-    #if defined(MTB_SRF_SUBMIT_USE_IPC) && defined(COMPONENT_MW_MTB_IPC)
-    return mtb_srf_ipc_request_submit(&cybsp_mtb_srf_client_context, inVec_ns, inVec_cnt_ns, outVec_ns, outVec_cnt_ns);
-    #endif /* if defined(MTB_SRF_SUBMIT_USE_IPC) && defined(COMPONENT_MW_MTB_IPC) */
-}
+CY_SECTION_SHAREDMEM _MTB_SRF_DATA_ALIGN uint32_t cy_pdl_srf_default_pool_memory[(MTB_SRF_POOL_ENTRY_SIZE(
+                                                                         MTB_SRF_MAX_ARG_IN_SIZE,
+                                                                         MTB_SRF_MAX_ARG_OUT_SIZE)
+                                                                     * MTB_SRF_POOL_SIZE) /
+                                                                    sizeof(uint32_t)];
 
 static cy_rslt_t _cybsp_ipc_srf_init()
 {
@@ -87,12 +81,14 @@ static cy_rslt_t _cybsp_ipc_srf_init()
         .semaphore_num          = MTB_IPC_SEMA_NUM_SRF
     };
 
-//     cy_stc_sysint_t intr_cfg_sema = {.intrSrc = (IRQn_Type)CY_IPC_INTR_MUX(ipc_config.semaphore_irq), .intrPriority = 7u};
-//     Cy_SysInt_Init(&intr_cfg_sema, cybsp_srf_ipc_semaphore_interrupt_handler);
-//     cy_stc_sysint_t intr_cfg_queue = {.intrSrc = (IRQn_Type)CY_IPC_INTR_MUX(ipc_config.queue_irq), .intrPriority = 7u};
-//     Cy_SysInt_Init(&intr_cfg_queue, cybsp_srf_ipc_queue_interrupt_handler);
-//     NVIC_EnableIRQ((IRQn_Type)CY_IPC_INTR_MUX(ipc_config.semaphore_irq));
-//     NVIC_EnableIRQ((IRQn_Type)CY_IPC_INTR_MUX(ipc_config.queue_irq));
+
+    IRQ_CONNECT(CY_IPC_INTR_MUX(MTB_IPC_IRQ_SEMA_SRF), IRQ_PRIO_LOWEST,
+                cybsp_srf_ipc_semaphore_interrupt_handler, NULL, 0);
+    IRQ_CONNECT(CY_IPC_INTR_MUX(MTB_IPC_IRQ_QUEUE_SRF), IRQ_PRIO_LOWEST,
+                cybsp_srf_ipc_queue_interrupt_handler, NULL, 0);
+    irq_enable(CY_IPC_INTR_MUX(MTB_IPC_IRQ_SEMA_SRF));
+    irq_enable(CY_IPC_INTR_MUX(MTB_IPC_IRQ_QUEUE_SRF));
+
     /** Setup IPC for use in secure requests */
     uint32_t mtb_srf_ipc_semaphore_idx_list[MTB_SRF_IPC_SEMA_COUNT];
     /* Initialize semaphore index list */
@@ -132,20 +128,29 @@ void soc_early_init_hook(void)
 	SCB_EnableDCache();
 
 	/* Initializes the system */
-	ifx_cycfg_init();
+    //This is proably still needed in the non TF-M interlinked case TODO_LC
+	// ifx_cycfg_init();
 
 	/* Initialize SystemCoreClock variable. */
-//	SystemCoreClockUpdate();
+	SystemCoreClockSetup(PSE84_CPU_FREQ_HZ, PSE84_CPU_FREQ_HZ);
+
+	/* This time is needed for m55 core to wait for the m33 to finish
+	 * configuring peripherals.
+	 */
+	Cy_SysLib_Delay(CM55_STARTUP_WAIT_MS);
+
+    // The init is done on cm33ns this call allowas to retrieve the configuration
+    Cy_IPC_Sema_Init(IPC0_SEMA_CH_NUM, 0, NULL);
+
+	mtb_srf_pool_init(&cy_pdl_srf_default_pool, &cy_pdl_srf_default_pool_memory[0],
+			  MTB_SRF_POOL_SIZE, MTB_SRF_MAX_ARG_IN_SIZE, MTB_SRF_MAX_ARG_OUT_SIZE);
+
 	_cybsp_ipc_srf_init();
 
 	static cy_stc_ipc_pipe_ep_t systemIpcPipeEpArray[CY_IPC_MAX_ENDPOINTS];
 
 	Cy_IPC_Pipe_Config(systemIpcPipeEpArray);
 
-	/* This time is needed for m55 core to wait for the m33 to finish
-	 * configuring peripherals.
-	 */
-	Cy_SysLib_Delay(CM55_STARTUP_WAIT_MS);
 }
 
 cy_israddress Cy_SysInt_SetVector(IRQn_Type IRQn, cy_israddress userIsr)
