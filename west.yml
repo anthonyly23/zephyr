@@ -23,7 +23,10 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: babblesim
       url-base: https://github.com/BabbleSim
-
+    - name: anthony_hal_fork
+      url-base: https://github.com/anthonyly23
+    - name: anthony_tfm_fork
+      url-base: https://github.com/anthonyly23
   group-filter: [-babblesim, -optional, -testing]
 
   #
@@ -188,6 +191,7 @@ manifest:
       groups:
         - hal
     - name: hal_infineon
+      remote: anthony_hal_fork
       revision: 3ae25facf70c296145f6e12aa10b4810d49c2b33
       path: modules/hal/infineon
       groups:
@@ -405,6 +409,7 @@ manifest:
       groups:
         - tee
     - name: trusted-firmware-m
+      remote: anthony_tfm_fork
       revision: 9a4cb1a280b63a5e66bd469e82eb75f2b3e05a78
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
