@@ -192,7 +192,7 @@ manifest:
         - hal
     - name: hal_infineon
       remote: anthony_hal_fork
-      revision: 3ae25facf70c296145f6e12aa10b4810d49c2b33
+      revision: 3c8d590a0a5f8c9d214d8ff8ac4c17eb5526a931
       path: modules/hal/infineon
       groups:
         - hal
@@ -410,7 +410,7 @@ manifest:
         - tee
     - name: trusted-firmware-m
       remote: anthony_tfm_fork
-      revision: 9a4cb1a280b63a5e66bd469e82eb75f2b3e05a78
+      revision: e317bd027dc110d737e5273db2009957b9c816c6
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
         - tee
