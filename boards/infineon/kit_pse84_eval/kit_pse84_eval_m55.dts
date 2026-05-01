@@ -56,6 +56,10 @@
 	status = "okay";
 };
 
+&rram0 {
+	reg = <0x02000000 DT_SIZE_K(512)>;
+};
+
 &peri1_group2_8bit_0 {
 	status = "okay";
 	clock-div = <2>;
