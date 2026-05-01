@@ -1,0 +1,20 @@
+/*
+ * SPDX-FileCopyrightText: <text>Copyright (c) 2026 Infineon Technologies AG,
+ * or an affiliate of Infineon Technologies AG. All rights reserved.</text>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+&rram0 {
+	rram_partitions {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "fixed-partitions";
+
+		/* Set 4Kb of storage at the end of the of 512kB rram0 */
+		test_partition_rram: partition@5b000 {
+			label = "storage_test";
+			reg = <0x5b000 DT_SIZE_K(4)>;
+		};
+	};
+};
