@@ -1,0 +1,13 @@
+sample:
+  name: USB Vendor-Class Bulk
+tests:
+  sample.usb_device_next.vendor_bulk:
+    depends_on: usbd
+    tags: usb
+    integration_platforms:
+      - frdm_k64f
+    harness: console
+    harness_config:
+      type: one_line
+      regex:
+        - "Vendor bulk class registered"

@@ -1,0 +1,13 @@
+sample:
+  name: CDC ACM USB TX
+tests:
+  sample.usb_device_next.cdc-acm-tx:
+    depends_on: usbd
+    tags: usb
+    integration_platforms:
+      - frdm_k64f
+    harness: console
+    harness_config:
+      type: one_line
+      regex:
+        - "TX stream active"
