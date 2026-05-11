@@ -28,6 +28,7 @@
 		zephyr,sram = &m33s_data;
 		zephyr,code-partition = &m33s_xip;
 		zephyr,console = &uart2;
+		zephyr,flash-controller = &flash_controller;
 		zephyr,shell-uart = &uart2;
 		zephyr,bt-hci = &bt_hci_uart;
 	};

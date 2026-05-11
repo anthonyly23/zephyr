@@ -69,19 +69,52 @@
 		};
 	};
 
-	/* Default Flash memory(16MB) assignment
-	 * - 1 MB  reserved for Storage
-	 * - 1 KB  header for CM33 Secure
-	 * - 2304 KB allocated to CM33 Secure XIP
-	 * - 1791 KB allocated to CM33 Non-Secure XIP
-	 * - 2 MB  allocated to CM55 XIP
+	/* Flash memory (16 MB) assignment
 	 *
-	 * Each code-partition uses zephyr,mapped-partition under the flash
-	 * alias whose base address matches the executing core's view.
+	 * Physical flash layout (offsets from flash base):
+	 *   0x000000 - 0x0FFFFF : storage (1 MB)
+	 *   0x100000 - 0x33FFFF : CM33 Secure image (slot0_s, 2.25 MB)
+	 *   0x340000 - 0x4FFFFF : CM33 Non-Secure image (slot0_ns/slot_2, 1.75 MB)
+	 *   0x500000 - 0x6FFFFF : CM55 image (slot4, 2 MB)
+	 *   0x700000 - 0x93FFFF : CM33 Secure secondary (slot1_s, 2.25 MB)
+	 *   0x940000 - 0xAFFFFF : CM33 Non-Secure secondary (slot1_ns/slot_3, 1.75 MB)
+	 *   0xB00000 - 0xCFFFFF : CM55 secondary (slot5, 2 MB)
+	 *
+	 * The PSE84 flash is reachable through four bus aliases (CBUS-S,
+	 * CBUS-NS and SAHB-S, SAHB-NS), so the Secure / Non-Secure halves of
+	 * the same physical image cannot share a single sub-partition parent
+	 * like on other vendors.
+	 * Instead each consumer gets a label attached to the node living
+	 * under the bus view it needs:
+	 *
+	 *   CBUS-S  (flash0_s, base 0x18000000): used by the SPE build as
+	 *           zephyr,flash and by MCUboot (which runs in secure state)
+	 *           to read every image's physical bytes. Carries the
+	 *           MCUboot image-numbering aliases for image 0 (SPE,
+	 *           slot0/slot1) and image 1 (NSPE, slot2/slot3) plus the
+	 *           role-named slot{0,1}_s_partition / m33s_xip aliases
+	 *           used by the SoC signing scripts.
+	 *
+	 *   CBUS-NS (flash0, base 0x08000000): used by the NSPE build as
+	 *           zephyr,flash. Carries the slot{0,1}_ns_partition /
+	 *           m33_xip aliases consumed by Zephyr DFU / mcumgr and by
+	 *           the NS application's zephyr,code-partition.
+	 *
+	 *   SAHB-NS (flash0_sahb, base 0x60000000): used by CM55 builds as
+	 *           zephyr,flash. Carries slot4 / slot5 (CM55 image).
+	 *
+	 *   SAHB-S  (base 0x70000000): unused in DTS but it's the programmable
+	 *           address for secure images (e.g. a secure app is built and
+	 *            linked for CBUS-S addresses but the hex/bin need to be
+	 *            flashed at the SAHB-S address)
+	 *
+	 * All fours views map to the same physical bytes.
+	 * CONFIG_ROM_START_OFFSET accounts for the image header (0x400) in
+	 * every case (extended boot header or MCUboot header).
 	 */
 	flash_controller: flash_controller@44460000 {
 		compatible = "infineon,qspi-flash";
-		reg = <0x44460000 0x20000>;
+		reg = <0x44460000 0x20000>, <0x18000000 0x1000000>;
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges;
@@ -105,7 +138,7 @@
 			write-block-size = <256>;
 			erase-block-size = <65536>;
 
-			partitions {
+			flash0_partitions: partitions {
 				#address-cells = <1>;
 				#size-cells = <1>;
 				ranges;
@@ -116,10 +149,18 @@
 					reg = <0 DT_SIZE_M(1)>;
 				};
 
-				m33_xip: m33_xip@340400 {
+				/* CM33 Non-Secure primary (NSPE run-time view). */
+				slot0_ns_partition: m33_xip: partition@340000 {
 					compatible = "zephyr,mapped-partition";
-					label = "m33-xip";
-					reg = <0x340400 0x1bfc00>;
+					label = "image-2";
+					reg = <0x340000 0x1c0000>;
+				};
+
+				/* CM33 Non-Secure secondary (NSPE upload view). */
+				slot1_ns_partition: partition@940000 {
+					compatible = "zephyr,mapped-partition";
+					label = "image-3";
+					reg = <0x940000 0x1c0000>;
 				};
 			};
 		};
@@ -145,33 +186,62 @@
 				#size-cells = <1>;
 				ranges;
 
-				m33s_header: m33s_header@100000 {
+				/*
+				 * CM33 Secure primary. Triple-labelled:
+				 *  - slot0_partition  : MCUboot image 0 primary
+				 *  - slot0_s_partition: SoC signing scripts
+				 *  - m33s_xip         : SPE zephyr,code-partition
+				 */
+				slot0_partition: slot0_s_partition: m33s_xip: partition@100000 {
 					compatible = "zephyr,mapped-partition";
-					label = "m33s-header";
-					reg = <0x100000 0x400>;
+					label = "image-0";
+					reg = <0x100000 0x240000>;
 				};
 
-				m33s_xip: m33s_xip@100400 {
+				/* CM33 Secure secondary (MCUboot image 0 upload). */
+				slot1_partition: slot1_s_partition: partition@700000 {
 					compatible = "zephyr,mapped-partition";
-					label = "m33s-xip";
-					reg = <0x100400 DT_SIZE_K(2304)>;
+					label = "image-1";
+					reg = <0x700000 0x240000>;
+				};
+
+				/*
+				 * CM33 Non-Secure primary, secure-view alias.
+				 * MCUboot runs in secure state and reads physical
+				 * flash via CBUS-S, so it needs slot2/slot3 here
+				 * even though the NS run-time uses the CBUS-NS
+				 * aliases (slot0_ns_partition / slot1_ns_partition
+				 * on flash0). The NS-side hex-addr is encoded into
+				 * the signed NS image at sign time.
+				 */
+				slot2_partition: partition@340000 {
+					compatible = "zephyr,mapped-partition";
+					label = "image-2-s";
+					reg = <0x340000 0x1c0000>;
+				};
+
+				/* CM33 Non-Secure secondary, secure-view alias. */
+				slot3_partition: partition@940000 {
+					compatible = "zephyr,mapped-partition";
+					label = "image-3-s";
+					reg = <0x940000 0x1c0000>;
 				};
 			};
 		};
 
 		/* SAHB view of the same external flash.
 		 * Used as zephyr,flash for CM55 builds.
-		 * The base address is 0x70000000.
+		 * The base address is 0x60000000.
 		 * This is the same physical device as flash0, accessed
 		 * through the SAHB alias as cm55 does not have
 		 * instruction-cached execution for external flash.
 		 */
-		flash0_sahb: flash0_sahb@70000000 {
+		flash0_sahb: flash0_sahb@60000000 {
 			compatible = "soc-nv-flash";
-			reg = <0x70000000 DT_SIZE_M(16)>;
+			reg = <0x60000000 DT_SIZE_M(16)>;
 			#address-cells = <1>;
 			#size-cells = <1>;
-			ranges = <0x0 0x70000000 DT_SIZE_M(16)>;
+			ranges = <0x0 0x60000000 DT_SIZE_M(16)>;
 			write-block-size = <256>;
 			erase-block-size = <65536>;
 
@@ -180,10 +250,61 @@
 				#size-cells = <1>;
 				ranges;
 
-				m55_xip: m55_xip@500000 {
+				/* CM55 primary image / MCUboot slot4 */
+				m55_xip: slot4_partition: partition@580000 {
 					compatible = "zephyr,mapped-partition";
-					label = "m55-xip";
-					reg = <0x500000 DT_SIZE_M(2)>;
+					label = "image-4";
+					reg = <0x580000 0x200000>;
+				};
+
+				/* MCUboot: CM55 secondary slot */
+				slot5_partition: partition@b00000 {
+					compatible = "zephyr,mapped-partition";
+					label = "image-5";
+					reg = <0xb00000 0x200000>;
+				};
+			};
+		};
+	};
+
+	/* RRAM memory (512 KB) assignment
+	 *   0x00000 - 0x10FFF : reserved (68 KB)
+	 *   0x11000 - 0x50FFF : boot_partition (256 KB) - MCUBoot bootloader
+	 *   0x51000 - 0x7FFFF : storage_rram (188 KB)
+	 */
+	rram_controller: rram_controller@42200000 {
+		compatible = "infineon,rram-controller";
+		reg = <0x42200000 0x10000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		status = "okay";
+
+		rram0: rram0@22000000 {
+			compatible = "soc-nv-flash";
+			reg = <0x22000000 DT_SIZE_K(512)>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0x0 0x22000000 DT_SIZE_K(512)>;
+			write-block-size = <16>;
+			erase-block-size = <16>;
+			status = "okay";
+
+			rram_partitions: partitions {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				ranges;
+
+				boot_partition: boot_partition@11000 {
+					compatible = "zephyr,mapped-partition";
+					label = "mcuboot";
+					reg = <0x11000 0x40000>;
+					read-only;
+				};
+
+				storage_partition_rram: storage_rram@51000 {
+					compatible = "zephyr,mapped-partition";
+					label = "storage_rram";
+					reg = <0x51000 0x2f000>;
 				};
 			};
 		};

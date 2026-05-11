@@ -43,4 +43,21 @@ config MAIN_STACK_SIZE
 
 endif # BT
 
-endif # BOARD_KIT_PSE84_EVAL_PSE846GPS2DBZC4A_M55
+endif # !BOARD_KIT_PSE84_EVAL_PSE846GPS2DBZC4A_M55
+
+# The extended boot of PSE84 validates a 0x400-byte MCUBoot-format header
+# at the start of the first image. ROM_START_OFFSET reserves space in the
+# ELF for imgtool to write the header into during signing.
+# This applies to all image types:
+# - Secure (extended boot image header)
+# - BUILD_WITH_TFM: NS app chain-loaded by TF-M (TF-M's BL2_HEADER_SIZE
+#   is fixed at 0x400 in platform/ext/target/infineon/pse84/config.cmake,
+#   and TF-M jumps to NS_BASE + BL2_HEADER_SIZE regardless of whether
+#   MCUBoot is also in the chain)
+# - BOOTLOADER_MCUBOOT: app chain-loaded by MCUBoot (MCUBoot image header)
+# - MCUBOOT: the MCUBoot bootloader itself (ext-boot image header)
+config ROM_START_OFFSET
+	default 0x400 if BOARD_KIT_PSE84_EVAL_PSE846GPS2DBZC4A_M33
+	default 0x400 if BUILD_WITH_TFM
+	default 0x400 if BOOTLOADER_MCUBOOT
+	default 0x400 if MCUBOOT
