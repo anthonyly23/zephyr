@@ -3,42 +3,72 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Adds mcuboot metadata to the PSE84 CM33 secure image using imgtool
-# with parameters derived from the DT memory map (header address,
-# header size, and slot size). Uses default version 0.0.0+0 as imgtool
-# requires a version parameter.
-# Registers the add metadata command and output file via
-# extra_post_build properties.
+# Adds ext-boot metadata header to a PSE84 CM33 secure hex image using imgtool.
+# Derives partition addresses and sizes from the devicetree.
 #
-# Usage: pse84_add_metadata_secure_hex(<input_hex> <output_hex>)
-function(pse84_add_metadata_secure_hex INPUT_FILE OUTPUT_FILE)
-  # flash0_s and flash0_sahb are two DT views (CBUS / SAHB) of the same
-  # physical external flash. Partitions are declared under flash0_s, so
-  # dt_reg_addr returns the CBUS-translated partition address. Translate
-  # from CBUS view to SAHB view by rebasing against the two flash node
-  # base addresses.
-  dt_nodelabel(flash_sahb NODELABEL "flash0_sahb")
-  dt_nodelabel(flash_s    NODELABEL "flash0_s")
-  dt_reg_addr(flash_sahb_addr PATH ${flash_sahb})
-  dt_reg_addr(flash_s_addr    PATH ${flash_s})
+# When CONFIG_MCUBOOT is set (building MCUBoot itself), uses boot_partition
+# for address/size and ROM_START_OFFSET for header size. The header space is
+# pre-reserved in the ELF so --pad-header is not used.
+#
+# Apps chain-loaded by MCUBoot (slot0/slot2) do NOT use this function —
+# their signing is handled by cmake/mcuboot.cmake.
+#
+# Otherwise (standalone secure image or TF-M SPE), uses m33s_xip with a
+# fixed header size of 0x400 (matches TF-M's BL2_HEADER_SIZE and the
+# extended boot ROM contract). The header is separate from the code
+# partition so --pad-header is used to prepend it.
+#
+# Usage: pse84_add_extboot_metadata(<input_hex> <output_hex> [PAD_HEADER])
+#
+# PAD_HEADER — pass --pad-header to imgtool. Use this when the input image
+#   does not pre-reserve the header area with zeros (e.g. TF-M SPE binary
+#   built by TF-M's own build system). Zephyr images that use
+#   ROM_START_OFFSET already have the space reserved and do NOT need this.
+function(pse84_add_extboot_metadata INPUT_FILE OUTPUT_FILE)
+  cmake_parse_arguments(ARG "PAD_HEADER" "" "" ${ARGN})
 
-  dt_nodelabel(m33s_header_node NODELABEL "m33s_header")
-  dt_nodelabel(m33s_xip_node    NODELABEL "m33s_xip")
-  dt_reg_addr(part_addr   PATH ${m33s_header_node})
-  dt_reg_size(header_size PATH ${m33s_header_node})
-  dt_reg_size(m33s_xip_size PATH ${m33s_xip_node})
+  if(CONFIG_MCUBOOT)
+    # MCUBoot bootloader image: use boot_partition, header from ROM_START_OFFSET.
+    dt_nodelabel(part_node NODELABEL "boot_partition")
+    dt_reg_addr(part_addr PATH ${part_node})
+    dt_reg_size(slot_size PATH ${part_node})
+    set(header_size ${CONFIG_ROM_START_OFFSET})
+  else()
+    # Standalone secure image or TF-M SPE: use m33s_xip partition.
+    #
+    # The header size is fixed at 0x400 to match TF-M's BL2_HEADER_SIZE
+    # (platform/ext/target/infineon/pse84/config.cmake) and the
+    # extended boot ROM contract. CONFIG_ROM_START_OFFSET cannot be
+    # used here because in NS-side TF-M builds this function runs from
+    # the NS application context where ROM_START_OFFSET reflects the
+    # NS image, not the SPE.
+    dt_nodelabel(part_node NODELABEL "m33s_xip")
+    dt_reg_addr(part_addr PATH ${part_node})
+    dt_reg_size(slot_size PATH ${part_node})
+    set(header_size 0x400)
+  endif()
 
-  math(EXPR slot_size "${m33s_xip_size} + ${header_size}" OUTPUT_FORMAT HEXADECIMAL)
+  if(ARG_PAD_HEADER)
+    set(pad_header_arg "--pad-header")
+  else()
+    set(pad_header_arg "")
+  endif()
 
-  # Rebase partition address from flash0_s space to flash0_sahb space.
-  math(EXPR header_sahb_addr
-       "${part_addr} - ${flash_s_addr} + ${flash_sahb_addr}"
-       OUTPUT_FORMAT HEXADECIMAL)
+  # With zephyr,mapped-partition, dt_reg_addr already returns the absolute
+  # address (translated through the parent's `ranges`), so no flash base
+  # needs to be added. Partitions in the CBUS-S address space still need
+  # BUILD_OUTPUT_ADJUST_LMA on top to rebase to the SAHB-S programming
+  # alias used by the flasher; RRAM partitions do not need this.
+  if(CONFIG_BUILD_OUTPUT_ADJUST_LMA)
+    math(EXPR hex_addr "${part_addr} + ${CONFIG_BUILD_OUTPUT_ADJUST_LMA}" OUTPUT_FORMAT HEXADECIMAL)
+  else()
+    set(hex_addr ${part_addr})
+  endif()
 
   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
     COMMAND ${PYTHON_EXECUTABLE} ${IMGTOOL} sign --version "0.0.0+0"
-      --header-size ${header_size} --erased-val 0xff --pad-header
-      --slot-size ${slot_size} --hex-addr ${header_sahb_addr}
+      --header-size ${header_size} --erased-val 0xff ${pad_header_arg}
+      --slot-size ${slot_size} --hex-addr ${hex_addr}
       ${INPUT_FILE} ${OUTPUT_FILE}
   )
   set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts ${OUTPUT_FILE})

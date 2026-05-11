@@ -621,21 +621,45 @@ if(CONFIG_BUILD_WITH_TFM)
     set(TFM_S_MERGE_HEX_FILE $<TARGET_PROPERTY:tfm,TFM_S_HEX_FILE>)
 
     if(CONFIG_SOC_SERIES_PSE84)
-      pse84_add_metadata_secure_hex(${TFM_S_HEX_FILE} ${S_SIGNED_HEX_FILE})
+      pse84_add_extboot_metadata(${TFM_S_HEX_FILE} ${S_SIGNED_HEX_FILE} PAD_HEADER)
       set(TFM_S_MERGE_HEX_FILE ${S_SIGNED_HEX_FILE})
+
+      # When chain-loaded by MCUboot, the default cmake/mcuboot.cmake
+      # signing script sets the runner hex_file to zephyr.signed.hex (NS
+      # image only). For PSE84 we want to flash tfm_merged.hex (signed SPE
+      # + NSPE). Override the SIGNING_SCRIPT before main CMakeLists picks
+      # it up — our wrapper runs mcuboot.cmake then fixes the hex_file.
+      if(CONFIG_BOOTLOADER_MCUBOOT)
+        set_target_properties(zephyr_property_target PROPERTIES
+          SIGNING_SCRIPT
+          ${ZEPHYR_BASE}/soc/infineon/edge/pse84/pse84_tfm_signing.cmake)
+
+        # When MCUboot validates both images independently
+        # (UPDATEABLE_IMAGE_NUMBER=2), the merged hex must contain the
+        # *signed* NSPE so MCUboot finds a valid header at slot2. The
+        # mergehex command is appended by pse84_tfm_signing.cmake so
+        # it runs after NS signing has produced zephyr.signed.hex.
+        set(PSE84_DEFER_MERGED_HEX TRUE)
+        set_property(GLOBAL PROPERTY pse84_tfm_s_merge_hex_file
+                                     ${TFM_S_MERGE_HEX_FILE})
+        set_property(GLOBAL PROPERTY pse84_merged_hex_file
+                                     ${MERGED_HEX_FILE})
+      endif()
     endif()
 
-    # Merge tfm_s and zephyr (NS) image to a single binary.
-    set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
-      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/build/mergehex.py
-        -o ${MERGED_HEX_FILE}
-        ${TFM_S_MERGE_HEX_FILE}
-        ${NS_HEX_APP_FILE}
-    )
+    if(NOT PSE84_DEFER_MERGED_HEX)
+      # Merge tfm_s and zephyr (NS) image to a single binary.
+      set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
+        COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/build/mergehex.py
+          -o ${MERGED_HEX_FILE}
+          ${TFM_S_MERGE_HEX_FILE}
+          ${NS_HEX_APP_FILE}
+      )
 
-    set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts
-      ${MERGED_HEX_FILE}
-    )
+      set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts
+        ${MERGED_HEX_FILE}
+      )
+    endif()
 
   elseif(CONFIG_TFM_MCUBOOT_IMAGE_NUMBER STREQUAL "1")
     tfm_sign(sign_cmd_s_ns_confirm_hex SUFFIX "S_NS"
