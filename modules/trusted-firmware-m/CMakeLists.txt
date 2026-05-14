@@ -293,6 +293,12 @@ if(CONFIG_BUILD_WITH_TFM)
       -DIFX_DEVICE_DB_LIB_PATH=${ZEPHYR_HAL_INFINEON_MODULE_DIR}/device-db
       -DIFX_BSP_LIB_PATH=${ZEPHYR_HAL_INFINEON_MODULE_DIR}/mtb-template-pse8xxgp/files
     )
+
+    if(CONFIG_PSOC_EDGE_M55_SRF_SUPPORT)
+      list(APPEND TFM_CMAKE_ARGS -DIFX_MTB_MAILBOX=ON)
+      list(APPEND TFM_CMAKE_ARGS -DIFX_CM55_NS_PRESENT=ON)
+    endif()
+
   endif()
 
   # By default TF-M installs TF-PSA-Crypto include files in the build directory,
