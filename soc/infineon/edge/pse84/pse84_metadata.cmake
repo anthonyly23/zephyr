@@ -69,6 +69,8 @@ function(pse84_add_extboot_metadata INPUT_FILE OUTPUT_FILE)
     COMMAND ${PYTHON_EXECUTABLE} ${IMGTOOL} sign --version "0.0.0+0"
       --header-size ${header_size} --erased-val 0xff ${pad_header_arg}
       --slot-size ${slot_size} --hex-addr ${hex_addr}
+      --key "C:/mtw3_7/SS/PSOC_Edge_Basic_Secure_App/keys/oem_private_key_0.pem"
+      --security-counter 1
       ${INPUT_FILE} ${OUTPUT_FILE}
   )
   set_property(GLOBAL APPEND PROPERTY extra_post_build_byproducts ${OUTPUT_FILE})
