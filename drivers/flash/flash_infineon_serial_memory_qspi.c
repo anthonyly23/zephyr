@@ -317,7 +317,6 @@ static int ifx_serial_memory_flash_init(const struct device *dev)
 		LOG_ERR("SMIF HW init failed: %d", ret);
 		return ret;
 	}
-#endif
 
 	/* Set-up serial memory. */
 	result = mtb_serial_memory_setup(&serial_memory_obj, MTB_SERIAL_MEMORY_CHIP_SELECT_1,
@@ -341,6 +340,8 @@ static int ifx_serial_memory_flash_init(const struct device *dev)
 #ifdef CONFIG_PM
 	Cy_SysPm_RegisterCallback(&flash_deep_sleep);
 #endif /* CONFIG_PM */
+
+#endif
 
 	return 0;
 }
