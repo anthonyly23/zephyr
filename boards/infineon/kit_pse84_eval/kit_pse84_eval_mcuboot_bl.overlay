@@ -14,10 +14,55 @@
  * across CBUS-S, CBUS-NS and SAHB) is defined in
  * kit_pse84_eval_memory_map.dtsi so that the bootloader inherits
  * the same view used by the SPE / NSPE / CM55 builds.
+ *
+ * SCB1 (uart1) is configured as the serial-recovery UART.
+ *   TX: P9.2  (p9_2_scb1_uart_tx)
+ *   RX: P9.3  (p9_3_scb1_uart_rx)
+ *   Clock: peri0_group8_16bit_0 @ 115200 baud
+ *
+ * The "zephyr,uart-mcumgr" chosen node points mcumgr / serial recovery
+ * to uart1 while the console (uart2 / SCB2) remains available for
+ * log output via the KitProg3 virtual COM port.
  */
 / {
 	chosen {
 		zephyr,code-partition = &boot_partition;
 		zephyr,flash = &rram0;
+		/* Direct MCUBoot serial recovery to SCB1 */
+		zephyr,uart-mcumgr = &uart1;
 	};
+
+	aliases {
+		/* SW_1 (P8.3) used as the serial recovery entrance button */
+		mcuboot-button0 = &user_bt;
+	};
+};
+
+/* Enable the peripheral 0, group 8 16-bit clock divider used by SCB1. */
+&peri0_group8_16bit_0 {
+	status = "okay";
+	clock-div = <1>;
+};
+
+/* SCB1 configured as a 115200-baud UART for serial recovery.
+ * Pin assignment: TX = P9.2, RX = P9.3.
+ * The pinctrl nodes are defined in pse84.bga-220.dtsi with /omit-if-no-ref/
+ * guards so referencing them here activates them automatically.
+ */
+uart1: &scb1 {
+	compatible = "infineon,uart";
+	status = "okay";
+	current-speed = <115200>;
+	clocks = <&peri0_group8_16bit_0>;
+	pinctrl-0 = <&p9_2_scb1_uart_tx &p9_3_scb1_uart_rx>;
+	pinctrl-names = "default";
+};
+
+/* Pin drive configuration for SCB1 UART. */
+&p9_2_scb1_uart_tx {
+	drive-push-pull;
+};
+
+&p9_3_scb1_uart_rx {
+	input-enable;
 };
